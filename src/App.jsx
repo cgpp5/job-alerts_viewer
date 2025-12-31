@@ -860,7 +860,7 @@ export default function App() {
       <header className="bg-white border-b border-gray-200 p-4 sticky top-0 z-10">
         <div className="flex justify-between items-center mb-4">
           <h1 className="text-xl font-mono font-bold tracking-tighter text-black flex items-center">
-            <img src="/icon-dark.svg" className="h-5 w-auto mr-2" alt="Logo" />job-alerts<span className="animate-pulse">_</span>
+            <img src="/icon-dark.svg" className="h-5 w-auto mr-2 mt-0.5" alt="Logo" />job-alerts<span className="animate-pulse">_</span>
           </h1>
           
           <div className="flex items-center gap-2">
