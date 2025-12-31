@@ -17,9 +17,12 @@ import {
   Banknote,
   Building2,
   Users,
+  LogOut,
   Loader2, 
   AlertCircle
 } from 'lucide-react';
+
+import Login from './Login';
 
 // --- CONFIGURACIÓN DE SUPABASE ---
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -49,6 +52,25 @@ const EMPLOYMENT_TRANSLATIONS = {
 };
 
 export default function App() {
+  const [session, setSession] = useState(null);
+  const [loadingSession, setLoadingSession] = useState(true);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setLoadingSession(false);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setLoadingSession(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
   // Estado para los trabajos, carga y errores
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -76,8 +98,8 @@ export default function App() {
 
   // --- EFECTO PARA CARGAR DATOS DE SUPABASE ---
   useEffect(() => {
-    fetchJobs();
-  }, []);
+    if (session) fetchJobs();
+  }, [session]);
 
   const fetchJobs = async () => {
     try {
@@ -345,6 +367,17 @@ export default function App() {
   };
 
   // --- PANTALLA DE CARGA / ERROR ---
+  if (loadingSession) return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-white text-black">
+      <Loader2 className="animate-spin mb-4" size={32} />
+      <p className="font-mono text-sm">Cargando sesión...</p>
+    </div>
+  );
+
+  if (!session) {
+    return <Login supabase={supabase} />;
+  }
+
   if (loading) return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-white text-black">
       <Loader2 className="animate-spin mb-4" size={32} />
@@ -830,21 +863,31 @@ export default function App() {
             <span className="mr-1 text-gray-400">&gt;</span>job-alerts<span className="animate-pulse">_</span>
           </h1>
           
-          <button 
-            onClick={() => setView('filters')}
-            className={`relative p-2.5 rounded-full transition-all duration-300 ${
-              activeFiltersCount > 0 
-                ? 'bg-black text-white shadow-lg shadow-gray-300' 
-                : 'bg-white text-black border border-gray-200 hover:border-black'
-            }`}
-          >
-            <Filter size={18} />
-            {activeFiltersCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] flex items-center justify-center rounded-full font-bold border-2 border-white">
-                {activeFiltersCount}
-              </span>
-            )}
-          </button>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => supabase.auth.signOut()}
+              className="p-2.5 rounded-full bg-white text-black border border-gray-200 hover:border-red-500 hover:text-red-500 transition-all duration-300"
+              title="Cerrar sesión"
+            >
+              <LogOut size={18} />
+            </button>
+
+            <button 
+              onClick={() => setView('filters')}
+              className={`relative p-2.5 rounded-full transition-all duration-300 ${
+                activeFiltersCount > 0 
+                  ? 'bg-black text-white shadow-lg shadow-gray-300' 
+                  : 'bg-white text-black border border-gray-200 hover:border-black'
+              }`}
+            >
+              <Filter size={18} />
+              {activeFiltersCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] flex items-center justify-center rounded-full font-bold border-2 border-white">
+                  {activeFiltersCount}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
         
         <div className="relative group">
