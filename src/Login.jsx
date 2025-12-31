@@ -28,7 +28,7 @@ export default function Login({ supabase }) {
       <div className="w-full max-w-md bg-white rounded-xl shadow-lg p-8 border border-gray-100">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-mono font-bold tracking-tighter text-black flex items-center justify-center">
-            <span className="mr-1 text-gray-400">&gt;</span>job-alerts<span className="animate-pulse">_</span>
+            <img src="/icon-dark.svg" className="h-6 w-auto mr-2" alt="Logo" />job-alerts<span className="animate-pulse">_</span>
           </h1>
           <p className="text-gray-500 text-sm mt-2">Inicia sesión para gestionar ofertas</p>
         </div>

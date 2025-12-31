@@ -337,8 +337,8 @@ export default function App() {
           <span className="font-medium text-black">{job.company}</span>
           <span className="text-gray-300">•</span>
           <span className="flex items-center gap-1">
-            {job.source === 'linkedin' ? <Linkedin size={12} /> : <Globe size={12} />}
-            <span className="capitalize">{job.source}</span>
+            <Globe size={12} />
+            <span>{job.origin}</span>
           </span>
         </div>
 
@@ -779,8 +779,8 @@ export default function App() {
             <div className="flex-1 border-r border-gray-100">
               <span className="block text-[10px] text-gray-400 uppercase tracking-wider mb-2">Fuente</span>
               <span className="flex items-center gap-2 font-medium text-sm">
-                {selectedJob.source === 'linkedin' ? <Linkedin size={14}/> : <Globe size={14}/>}
-                <span className="capitalize">{selectedJob.source}</span>
+                <Globe size={14}/>
+                <span>{selectedJob.origin}</span>
               </span>
             </div>
             <div className="flex-1 border-r border-gray-100 pl-4">
@@ -860,7 +860,7 @@ export default function App() {
       <header className="bg-white border-b border-gray-200 p-4 sticky top-0 z-10">
         <div className="flex justify-between items-center mb-4">
           <h1 className="text-xl font-mono font-bold tracking-tighter text-black flex items-center">
-            <span className="mr-1 text-gray-400">&gt;</span>job-alerts<span className="animate-pulse">_</span>
+            <img src="/icon-dark.svg" className="h-5 w-auto mr-2" alt="Logo" />job-alerts<span className="animate-pulse">_</span>
           </h1>
           
           <div className="flex items-center gap-2">
