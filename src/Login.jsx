@@ -40,7 +40,7 @@ export default function Login({ supabase }) {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-200 rounded-lg py-3 px-4 text-sm focus:border-black focus:ring-0 outline-none transition-colors"
+              className="w-full bg-gray-50 border border-gray-200 rounded-lg py-3 px-4 text-base focus:border-black focus:ring-0 outline-none transition-colors"
               placeholder="tu@email.com"
               required
             />
@@ -52,7 +52,7 @@ export default function Login({ supabase }) {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-200 rounded-lg py-3 px-4 text-sm focus:border-black focus:ring-0 outline-none transition-colors"
+              className="w-full bg-gray-50 border border-gray-200 rounded-lg py-3 px-4 text-base focus:border-black focus:ring-0 outline-none transition-colors"
               placeholder="••••••••"
               required
             />

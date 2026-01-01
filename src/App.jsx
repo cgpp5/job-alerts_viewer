@@ -703,7 +703,7 @@ export default function App() {
                 placeholder="Ej. Madrid, Barcelona..." 
                 value={filterLocation}
                 onChange={(e) => setFilterLocation(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-200 rounded-lg py-2.5 pl-10 pr-4 text-sm focus:border-black focus:ring-0 outline-none transition-colors font-sans"
+                className="w-full bg-gray-50 border border-gray-200 rounded-lg py-2.5 pl-10 pr-4 text-base focus:border-black focus:ring-0 outline-none transition-colors font-sans"
               />
             </div>
           </div>
@@ -1086,7 +1086,7 @@ export default function App() {
             placeholder="Buscar..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2 pl-9 pr-4 text-sm font-medium focus:border-black focus:bg-white focus:ring-0 transition-all outline-none placeholder:text-gray-400"
+            className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2 pl-9 pr-4 text-base font-medium focus:border-black focus:bg-white focus:ring-0 transition-all outline-none placeholder:text-gray-400"
           />
         </div>
       </header>
