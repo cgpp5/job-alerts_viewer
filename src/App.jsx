@@ -104,20 +104,20 @@ export default function App() {
   
   // --- ESTADOS DE FILTROS ---
   const [searchTerm, setSearchTerm] = useState("");
-  const debouncedSearchTerm = useDebounce(searchTerm, 500);
+  const debouncedSearchTerm = useDebounce(searchTerm, 1000);
 
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterWorkplace, setFilterWorkplace] = useState([]); 
   const [filterEmployment, setFilterEmployment] = useState([]);
   const [filterLocation, setFilterLocation] = useState("");
-  const debouncedFilterLocation = useDebounce(filterLocation, 500);
+  const debouncedFilterLocation = useDebounce(filterLocation, 1000);
 
   const [filterSalary, setFilterSalary] = useState(0);
-  const debouncedFilterSalary = useDebounce(filterSalary, 500);
+  const debouncedFilterSalary = useDebounce(filterSalary, 1000);
 
   const [filterSkills, setFilterSkills] = useState([]);
   const [filterExperience, setFilterExperience] = useState([0, 30]);
-  const debouncedFilterExperience = useDebounce(filterExperience, 500);
+  const debouncedFilterExperience = useDebounce(filterExperience, 1000);
 
   const [filterLanguages, setFilterLanguages] = useState([]);
   
@@ -440,7 +440,7 @@ export default function App() {
       }`}
     >
       <div className="flex justify-between items-start mb-2">
-        <h3 className={`text-lg font-bold leading-tight pr-8 text-black`}>
+        <h3 className={`text-lg font-bold leading-tight pr-8 ${isClosed ? 'text-black opacity-50 grayscale' : 'text-black'}`}>
           {job.title}
         </h3>
         
@@ -571,9 +571,9 @@ export default function App() {
                 filterExperience,
                 filterLanguages
               })}
-              className="text-xs bg-black text-white px-3 py-1.5 rounded-full font-medium hover:bg-gray-800 transition-colors flex items-center gap-1"
+              className="text-sm bg-black text-white px-4 py-2 rounded-full font-medium hover:bg-gray-800 transition-colors flex items-center gap-2"
             >
-              <BellRing size={12} />
+              <BellRing size={14} />
               Crear Alerta con Filtros Actuales
             </button>
           </div>
@@ -616,7 +616,7 @@ export default function App() {
           
           {/* 1. ESTADO */}
           <div>
-            <label className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3 block">estado</label>
+            <label className="text-xs font-bold uppercase tracking-widest text-black mb-3 block">estado</label>
             <div className="flex flex-wrap gap-2">
               {['Open', 'Closed'].map(status => (
                 <button
@@ -636,7 +636,7 @@ export default function App() {
 
           {/* 2. TIPO */}
           <div>
-            <label className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3 block">tipo</label>
+            <label className="text-xs font-bold uppercase tracking-widest text-black mb-3 block">tipo</label>
             <div className="flex flex-wrap gap-2">
               {[
                 { value: 'On-site', label: 'Presencial' },
@@ -660,7 +660,7 @@ export default function App() {
 
           {/* 3. CONTRATO */}
           <div>
-            <label className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3 block">contrato</label>
+            <label className="text-xs font-bold uppercase tracking-widest text-black mb-3 block">contrato</label>
             <div className="flex flex-wrap gap-2">
               {[
                 { value: 'Full-time', label: 'Tiempo completo' },
@@ -685,7 +685,7 @@ export default function App() {
 
           {/* 4. LOCALIZACIÓN */}
           <div>
-            <label className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3 block">localización</label>
+            <label className="text-xs font-bold uppercase tracking-widest text-black mb-3 block">localización</label>
             <div className="relative">
               <MapPin className="absolute left-3 top-3 text-gray-400" size={16} />
               <input 
@@ -701,7 +701,7 @@ export default function App() {
           {/* 5. SALARIO */}
           <div>
             <div className="flex justify-between items-center mb-3">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-400 block">salario mínimo</label>
+              <label className="text-xs font-bold uppercase tracking-widest text-black block">salario mínimo</label>
               <span className="text-xs font-bold font-mono">
                 {filterSalary > 0 ? `${(filterSalary/1000)}k €` : 'Cualquiera'}
               </span>
@@ -726,7 +726,7 @@ export default function App() {
 
           {/* 6. HABILIDADES */}
           <div>
-            <label className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3 flex items-center justify-between">
+            <label className="text-xs font-bold uppercase tracking-widest text-black mb-3 flex items-center justify-between">
               <span>habilidades</span>
               {filterSkills.length > 0 && <span className="text-black text-[10px] font-mono">{filterSkills.length} sel</span>}
             </label>
@@ -750,7 +750,7 @@ export default function App() {
           {/* 7. EXPERIENCIA */}
           <div>
             <div className="flex justify-between items-center mb-3">
-              <label className="text-xs font-bold uppercase tracking-widest text-gray-400 block">experiencia</label>
+              <label className="text-xs font-bold uppercase tracking-widest text-black block">experiencia</label>
               <span className="text-xs font-bold font-mono">
                 {filterExperience[0] === 0 && filterExperience[1] === 30 ? 'Cualquiera' : `${filterExperience[0]} - ${filterExperience[1]}`}
               </span>
@@ -795,7 +795,7 @@ export default function App() {
 
           {/* 8. IDIOMAS */}
           <div>
-            <label className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3 flex items-center justify-between">
+            <label className="text-xs font-bold uppercase tracking-widest text-black mb-3 flex items-center justify-between">
               <span>idiomas</span>
               {filterLanguages.length > 0 && <span className="text-black text-[10px] font-mono">{filterLanguages.length} sel</span>}
             </label>
