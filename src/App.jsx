@@ -172,12 +172,16 @@ export default function App() {
 
         // 3. Workplace (Array -> IN)
         if (filterWorkplace.length > 0) {
-          query = query.in('workplace_type', filterWorkplace);
+          // Match si está en la lista O si es NULL
+          const values = filterWorkplace.map(v => `"${v}"`).join(',');
+          query = query.or(`workplace_type.in.(${values}),workplace_type.is.null`);
         }
 
         // 4. Employment (Array -> IN)
         if (filterEmployment.length > 0) {
-          query = query.in('employment_type', filterEmployment);
+          // Match si está en la lista O si es NULL
+          const values = filterEmployment.map(v => `"${v}"`).join(',');
+          query = query.or(`employment_type.in.(${values}),employment_type.is.null`);
         }
 
         // 5. Location
@@ -188,7 +192,8 @@ export default function App() {
 
         // 6. Salario
         if (debouncedFilterSalary > 0) {
-          query = query.or(`salary_min.gte.${debouncedFilterSalary},salary_max.gte.${debouncedFilterSalary}`);
+          // Match si cumple el rango O si no tiene salario especificado (NULL)
+          query = query.or(`salary_min.gte.${debouncedFilterSalary},salary_max.gte.${debouncedFilterSalary},salary_min.is.null`);
         }
 
         // 7. Skills (Array contains) - Lógica OR
@@ -205,10 +210,12 @@ export default function App() {
         // 8. Experiencia
         // Solo aplicamos filtro si el rango es diferente al por defecto [0, 30]
         if (debouncedFilterExperience[0] > 0) {
-           query = query.gte('required_experience_years', debouncedFilterExperience[0]);
+           // Match si es mayor al mínimo O si es NULL (no especificado)
+           query = query.or(`required_experience_years.gte.${debouncedFilterExperience[0]},required_experience_years.is.null`);
         }
         if (debouncedFilterExperience[1] < 30) {
-           query = query.lte('required_experience_years', debouncedFilterExperience[1]);
+           // Match si es menor al máximo O si es NULL (no especificado)
+           query = query.or(`required_experience_years.lte.${debouncedFilterExperience[1]},required_experience_years.is.null`);
         }
 
         // 9. Idiomas (Backend con JSON arrow operators)
@@ -546,7 +553,10 @@ export default function App() {
           }
         `}</style>
 
-        <div className="p-6 pb-4 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white z-10">
+        <div 
+          className="p-6 pb-4 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white z-10"
+          style={{ paddingTop: 'max(1.5rem, calc(env(safe-area-inset-top) + 1.5rem))' }}
+        >
           <h2 className="text-2xl font-bold tracking-tight">filtros</h2>
           <button onClick={() => setView('list')} className="p-2 border border-gray-200 rounded-full hover:bg-gray-50">
             <X size={20} />
@@ -834,7 +844,10 @@ export default function App() {
   if (view === 'detail' && selectedJob) {
     return (
       <div className="min-h-screen bg-white flex flex-col animate-in slide-in-from-right duration-300 font-sans">
-        <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-md border-b border-gray-200 p-4 flex justify-between items-center">
+        <div 
+          className="sticky top-0 z-10 bg-white/95 backdrop-blur-md border-b border-gray-200 p-4 flex justify-between items-center"
+          style={{ paddingTop: 'max(1rem, calc(env(safe-area-inset-top) + 1rem))' }}
+        >
           <div className="flex items-center gap-1 -ml-2">
             <button 
               onClick={handlePrevJob} 
@@ -984,7 +997,7 @@ export default function App() {
           </div>
 
           <div className="prose prose-sm prose-gray max-w-none pb-10">
-            <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">Descripción del puesto</h3>
+            <h3 className="text-xs font-bold uppercase tracking-widest text-black mb-3">Descripción del puesto</h3>
             <p className="whitespace-pre-line text-gray-800 leading-relaxed font-light text-base">
               {selectedJob.description_text}
             </p>
@@ -1030,7 +1043,10 @@ export default function App() {
       `}</style>
 
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 p-4 sticky top-0 z-10">
+      <header 
+        className="bg-white border-b border-gray-200 p-4 sticky top-0 z-10"
+        style={{ paddingTop: 'max(1rem, calc(env(safe-area-inset-top) + 1rem))' }}
+      >
         <div className="flex justify-between items-center mb-4">
           <h1 className="text-xl font-mono font-bold tracking-tighter text-black flex items-center">
             <img src="/icon-dark.png" className="h-5 w-auto mr-2" alt="Logo" />job-alerts<span className="animate-pulse">_</span>
