@@ -19,10 +19,15 @@ import {
   Users,
   LogOut,
   Loader2, 
-  AlertCircle
+  AlertCircle,
+  Bell,
+  BellRing
 } from 'lucide-react';
 
 import Login from './Login';
+import { useJobAlerts } from './hooks/useJobAlerts';
+import { useReadJobs } from './hooks/useReadJobs';
+import { useDebounce } from './hooks/useDebounce';
 
 // --- CONFIGURACIÓN DE SUPABASE ---
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -36,6 +41,15 @@ const getUniqueValues = (data, key) => {
 };
 
 const LANGUAGES_LIST = ["Inglés", "Español", "Catalán", "Francés", "Italiano", "Alemán"];
+
+const LANGUAGE_MAP = {
+  "Inglés": "English",
+  "Español": "Spanish",
+  "Catalán": "Catalan",
+  "Francés": "French",
+  "Italiano": "Italian",
+  "Alemán": "German"
+};
 
 const WORKPLACE_TRANSLATIONS = {
   'On-site': 'Presencial',
@@ -55,6 +69,12 @@ export default function App() {
   const [session, setSession] = useState(null);
   const [loadingSession, setLoadingSession] = useState(true);
 
+  // --- ALERTAS ---
+  const { alerts, addAlert, removeAlert } = useJobAlerts(supabase);
+  
+  // --- LEÍDOS ---
+  const { isRead, markAsRead } = useReadJobs();
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -73,6 +93,7 @@ export default function App() {
 
   // Estado para los trabajos, carga y errores
   const [jobs, setJobs] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -83,60 +104,177 @@ export default function App() {
   
   // --- ESTADOS DE FILTROS ---
   const [searchTerm, setSearchTerm] = useState("");
+  const debouncedSearchTerm = useDebounce(searchTerm, 500);
+
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterWorkplace, setFilterWorkplace] = useState([]); 
   const [filterEmployment, setFilterEmployment] = useState([]);
   const [filterLocation, setFilterLocation] = useState("");
+  const debouncedFilterLocation = useDebounce(filterLocation, 500);
+
   const [filterSalary, setFilterSalary] = useState(0);
+  const debouncedFilterSalary = useDebounce(filterSalary, 500);
+
   const [filterSkills, setFilterSkills] = useState([]);
   const [filterExperience, setFilterExperience] = useState([0, 30]);
+  const debouncedFilterExperience = useDebounce(filterExperience, 500);
+
   const [filterLanguages, setFilterLanguages] = useState([]);
+  
+  // Estado para la lista completa de skills (para los filtros)
+  const [allAvailableSkills, setAllAvailableSkills] = useState([]);
 
   // --- PAGINACIÓN ---
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 25;
 
-  // --- EFECTO PARA CARGAR DATOS DE SUPABASE ---
+  // --- CARGA INICIAL DE SKILLS ---
   useEffect(() => {
-    if (session) fetchJobs();
-  }, [session]);
-
-  const fetchJobs = async () => {
-    try {
-      setLoading(true);
-      // Hacemos la consulta a la tabla 'jobs'
-      // Supabase limita por defecto a 1000 filas. Aumentamos el rango para traer más.
+    async function loadAllSkills() {
+      // Descargamos solo la columna de skills de todas las ofertas para poblar el filtro
+      // Esto es mucho más ligero que descargar toda la tabla con descripciones
       const { data, error } = await supabase
         .from('jobs')
-        .select('*')
-        .order('posted_on', { ascending: false, nullsFirst: false })
-        .range(0, 9999);
+        .select('required_skills')
+        .range(0, 9999); // Traemos un número alto para cubrir todas
 
-      if (error) throw error;
-
-      // Procesamos los datos para asegurar que skills y languages sean Arrays.
-      // Supabase devuelve JSONb como objetos/arrays automáticamente, pero mantenemos compatibilidad.
-      const formattedData = data.map(job => ({
-        ...job,
-        required_skills: Array.isArray(job.required_skills) 
-          ? job.required_skills 
-          : (typeof job.required_skills === 'string' ? JSON.parse(job.required_skills || '[]') : []),
-        
-        required_languages: Array.isArray(job.required_languages)
-          ? job.required_languages
-          : (typeof job.required_languages === 'string' ? JSON.parse(job.required_languages || '[]') : [])
-      }));
-
-      setJobs(formattedData);
-    } catch (err) {
-      console.error("Error cargando ofertas:", err);
-      setError("No se pudieron cargar las ofertas. Revisa tu conexión a Supabase.");
-    } finally {
-      setLoading(false);
+      if (!error && data) {
+        const uniqueSkills = getUniqueValues(data, 'required_skills');
+        setAllAvailableSkills(uniqueSkills);
+      }
     }
-  };
+    
+    loadAllSkills();
+  }, []);
 
-  const allSkills = useMemo(() => getUniqueValues(jobs, 'required_skills'), [jobs]);
+  // --- EFECTO PARA CARGAR DATOS DE SUPABASE (BACKEND FILTERING) ---
+  useEffect(() => {
+    if (!session) return;
+
+    async function fetchJobs() {
+      setLoading(true);
+      setError(null);
+
+      try {
+        let query = supabase
+          .from('jobs')
+          .select('*', { count: 'exact' });
+
+        // 1. Búsqueda (Search Term)
+        if (debouncedSearchTerm) {
+          query = query.or(`title.ilike.%${debouncedSearchTerm}%,company.ilike.%${debouncedSearchTerm}%`);
+        }
+
+        // 2. Estado
+        if (filterStatus !== 'all') {
+          query = query.eq('status', filterStatus);
+        }
+
+        // 3. Workplace (Array -> IN)
+        if (filterWorkplace.length > 0) {
+          query = query.in('workplace_type', filterWorkplace);
+        }
+
+        // 4. Employment (Array -> IN)
+        if (filterEmployment.length > 0) {
+          query = query.in('employment_type', filterEmployment);
+        }
+
+        // 5. Location
+        if (debouncedFilterLocation) {
+          // Usamos ilike con comodines para búsqueda parcial insensible a mayúsculas
+          query = query.ilike('location', `%${debouncedFilterLocation}%`);
+        }
+
+        // 6. Salario
+        if (debouncedFilterSalary > 0) {
+          query = query.or(`salary_min.gte.${debouncedFilterSalary},salary_max.gte.${debouncedFilterSalary}`);
+        }
+
+        // 7. Skills (Array contains) - Lógica OR
+        if (filterSkills.length > 0) {
+          // Queremos que la oferta tenga AL MENOS UNA de las skills seleccionadas (OR)
+          // Sintaxis Supabase: .or('col.cs.{"A"},col.cs.{"B"}')
+          const orConditions = filterSkills.map(skill => 
+             `required_skills.cs.${JSON.stringify([skill])}`
+          ).join(',');
+          
+          query = query.or(orConditions);
+        }
+
+        // 8. Experiencia
+        // Solo aplicamos filtro si el rango es diferente al por defecto [0, 30]
+        if (debouncedFilterExperience[0] > 0) {
+           query = query.gte('required_experience_years', debouncedFilterExperience[0]);
+        }
+        if (debouncedFilterExperience[1] < 30) {
+           query = query.lte('required_experience_years', debouncedFilterExperience[1]);
+        }
+
+        // 9. Idiomas (Backend con JSON arrow operators)
+        if (filterLanguages.length > 0) {
+          const conditions = filterLanguages.map(lang => {
+             const dbLang = LANGUAGE_MAP[lang] || lang;
+             // Usamos el operador -> para acceder a la clave del JSON.
+             return `required_languages->${dbLang}.not.is.null`;
+          });
+
+          // Incluimos ofertas con JSON vacío {} (sin requisitos de idioma)
+          conditions.push('required_languages.eq.{}');
+
+          query = query.or(conditions.join(','));
+        }
+
+        // Paginación
+        const from = (currentPage - 1) * ITEMS_PER_PAGE;
+        const to = from + ITEMS_PER_PAGE - 1;
+        
+        query = query
+          .order('posted_on', { ascending: false, nullsFirst: false })
+          .range(from, to);
+
+        const { data, error, count } = await query;
+
+        if (error) throw error;
+
+        // Procesamos los datos para asegurar que skills y languages sean Arrays.
+        const formattedData = data.map(job => ({
+          ...job,
+          required_skills: Array.isArray(job.required_skills) 
+            ? job.required_skills 
+            : (typeof job.required_skills === 'string' ? JSON.parse(job.required_skills || '[]') : []),
+          
+          required_languages: Array.isArray(job.required_languages)
+            ? job.required_languages
+            : (typeof job.required_languages === 'string' ? JSON.parse(job.required_languages || '[]') : [])
+        }));
+
+        setJobs(formattedData);
+        setTotalCount(count);
+      } catch (err) {
+        console.error("Error fetching jobs:", err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchJobs();
+  }, [
+    session,
+    currentPage, 
+    debouncedSearchTerm, 
+    filterStatus, 
+    filterWorkplace, 
+    filterEmployment, 
+    debouncedFilterLocation, 
+    debouncedFilterSalary, 
+    filterSkills, 
+    debouncedFilterExperience,
+    filterLanguages
+  ]);
+
+
 
   const formatDate = (dateStr) => {
     if (!dateStr) return 'Sin fecha';
@@ -216,68 +354,43 @@ export default function App() {
     setFilterExperience(newRange);
   };
 
-  const filteredJobs = useMemo(() => {
-    return jobs.filter(job => {
-      const matchesSearch = (job.title || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
-                            (job.company || '').toLowerCase().includes(searchTerm.toLowerCase());
-      
-      const matchesStatus = filterStatus === 'all' || job.status === filterStatus;
-      
-      const matchesWorkplace = filterWorkplace.length === 0 || 
-                               filterWorkplace.includes(job.workplace_type);
-
-      const matchesEmployment = filterEmployment.length === 0 || 
-                                filterEmployment.some(type => (job.employment_type || '').includes(type));
-
-      const matchesLocation = filterLocation === "" || 
-                              (job.location || '').toLowerCase().includes(filterLocation.toLowerCase());
-      
-      // El filtro comprueba si el rango salarial de la oferta alcanza o supera el filtro seleccionado.
-      // Si la oferta es 30k-60k y el filtro es 40k, entra (60 >= 40).
-      const matchesSalary = (job.salary_max || job.salary_min || 0) >= filterSalary;
-
-      const matchesSkills = filterSkills.length === 0 || 
-                            filterSkills.every(skill => (job.required_skills || []).includes(skill));
-
-      const exp = job.required_experience_years || 0;
-      const matchesExperience = exp >= filterExperience[0] && exp <= filterExperience[1];
-
-      const matchesLanguages = filterLanguages.length === 0 || 
-                               filterLanguages.every(filterLang => 
-                                 (job.required_languages || []).some(lang => {
-                                   if (typeof lang === 'string') return lang === filterLang;
-                                   if (typeof lang === 'object' && lang !== null) return Object.keys(lang)[0] === filterLang;
-                                   return false;
-                                 })
-                               );
-      
-      return matchesSearch && matchesStatus && matchesWorkplace && matchesEmployment && matchesLocation && matchesSalary && matchesSkills && matchesExperience && matchesLanguages;
-    });
-  }, [jobs, searchTerm, filterStatus, filterWorkplace, filterEmployment, filterLocation, filterSalary, filterSkills, filterExperience, filterLanguages]);
-
   const currentJobIndex = useMemo(() => {
     if (!selectedJob) return -1;
-    return filteredJobs.findIndex(j => j.job_id === selectedJob.job_id);
-  }, [selectedJob, filteredJobs]);
+    return jobs.findIndex(j => j.job_id === selectedJob.job_id);
+  }, [selectedJob, jobs]);
+
+  const loadAlertFilters = (filters) => {
+    setSearchTerm(filters.searchTerm || "");
+    setFilterStatus(filters.filterStatus || 'all');
+    setFilterWorkplace(filters.filterWorkplace || []);
+    setFilterEmployment(filters.filterEmployment || []);
+    setFilterLocation(filters.filterLocation || "");
+    setFilterSalary(filters.filterSalary || 0);
+    setFilterSkills(filters.filterSkills || []);
+    setFilterExperience(filters.filterExperience || [0, 30]);
+    setFilterLanguages(filters.filterLanguages || []);
+    // Feedback visual opcional o simplemente cerrar filtros si se desea
+    // setView('list'); // Descomentar si se quiere ir directo a la lista
+  };
 
   const handlePrevJob = () => {
-    if (currentJobIndex > 0) setSelectedJob(filteredJobs[currentJobIndex - 1]);
+    if (currentJobIndex > 0) setSelectedJob(jobs[currentJobIndex - 1]);
   };
 
   const handleNextJob = () => {
-    if (currentJobIndex < filteredJobs.length - 1) setSelectedJob(filteredJobs[currentJobIndex + 1]);
+    if (currentJobIndex < jobs.length - 1) setSelectedJob(jobs[currentJobIndex + 1]);
   };
 
-  const totalPages = Math.ceil(filteredJobs.length / ITEMS_PER_PAGE);
+  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
 
   // --- TECLADO DE NAVEGACIÓN ---
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (view === 'detail') {
         if (e.key === 'ArrowLeft') {
-          if (currentJobIndex > 0) setSelectedJob(filteredJobs[currentJobIndex - 1]);
+          if (currentJobIndex > 0) setSelectedJob(jobs[currentJobIndex - 1]);
         } else if (e.key === 'ArrowRight') {
-          if (currentJobIndex < filteredJobs.length - 1) setSelectedJob(filteredJobs[currentJobIndex + 1]);
+          if (currentJobIndex < jobs.length - 1) setSelectedJob(jobs[currentJobIndex + 1]);
         }
       } else if (view === 'list') {
         if (e.key === 'ArrowLeft') {
@@ -290,7 +403,7 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [view, currentJobIndex, filteredJobs, totalPages]);
+  }, [view, currentJobIndex, jobs, totalPages]);
 
   // --- PAGINACIÓN LÓGICA ---
   useEffect(() => {
@@ -307,29 +420,35 @@ export default function App() {
     }
   }, [currentPage]);
 
-  const paginatedJobs = filteredJobs.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  const paginatedJobs = jobs;
 
   // --- COMPONENTE: TARJETA DE TRABAJO ---
   const JobCard = ({ job }) => {
     const isClosed = job.status === 'Closed';
     const isOpen = job.status === 'Open';
+    const read = isRead(job.job_id);
 
     return (
     <div 
-      onClick={() => { setSelectedJob(job); setView('detail'); }}
+      onClick={() => { 
+        markAsRead(job.job_id);
+        setSelectedJob(job); 
+        setView('detail'); 
+      }}
       className={`group relative p-5 border-b border-gray-200 transition-colors cursor-pointer ${
         isClosed ? 'bg-gray-50' : 'bg-white active:bg-gray-50'
       }`}
     >
       <div className="flex justify-between items-start mb-2">
-        <h3 className={`text-lg font-bold leading-tight pr-8 ${isClosed ? 'line-through text-gray-400 opacity-60' : 'text-black'}`}>
+        <h3 className={`text-lg font-bold leading-tight pr-8 text-black`}>
           {job.title}
         </h3>
-        <div 
-          className={`w-3 h-3 rounded-full mt-1.5 flex-shrink-0 border border-black/5 shadow-sm ${
-            isOpen ? 'bg-green-500' : 'bg-red-500'
-          }`}
-        />
+        
+        <div className="relative mt-1.5 flex-shrink-0">
+          {!read && !isClosed && (
+            <div className="w-2.5 h-2.5 bg-blue-600 rounded-full shadow-sm" title="Nueva oferta" />
+          )}
+        </div>
       </div>
       
       <div className={isClosed ? 'opacity-50 grayscale' : ''}>
@@ -432,6 +551,65 @@ export default function App() {
           <button onClick={() => setView('list')} className="p-2 border border-gray-200 rounded-full hover:bg-gray-50">
             <X size={20} />
           </button>
+        </div>
+
+        {/* --- SECCIÓN DE ALERTAS --- */}
+        <div className="px-6 py-4 bg-gray-50 border-b border-gray-100">
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="text-sm font-bold uppercase tracking-widest text-gray-500 flex items-center gap-2">
+              <Bell size={14} /> Alertas Activas
+            </h3>
+            <button 
+              onClick={() => addAlert({
+                searchTerm,
+                filterStatus,
+                filterWorkplace,
+                filterEmployment,
+                filterLocation,
+                filterSalary,
+                filterSkills,
+                filterExperience,
+                filterLanguages
+              })}
+              className="text-xs bg-black text-white px-3 py-1.5 rounded-full font-medium hover:bg-gray-800 transition-colors flex items-center gap-1"
+            >
+              <BellRing size={12} />
+              Crear Alerta con Filtros Actuales
+            </button>
+          </div>
+          
+          {alerts.length === 0 ? (
+            <p className="text-xs text-gray-400 italic">No tienes alertas activas.</p>
+          ) : (
+            <div className="space-y-2">
+              {alerts.map(alert => (
+                <div 
+                  key={alert.id} 
+                  onClick={() => loadAlertFilters(alert.filters)}
+                  className="bg-white p-3 rounded-lg border border-gray-200 flex justify-between items-center shadow-sm cursor-pointer hover:border-black hover:shadow-md transition-all group"
+                  title="Haz clic para cargar estos filtros"
+                >
+                  <div className="text-xs text-gray-600">
+                    <span className="font-bold block mb-1 text-gray-800 group-hover:text-black">
+                      Alerta del {new Date(alert.createdAt).toLocaleDateString()}
+                    </span>
+                    <span className="line-clamp-1">
+                      {alert.filters.searchTerm ? `"${alert.filters.searchTerm}"` : 'Cualquier texto'} • {alert.filters.filterLocation || 'Cualquier lugar'}
+                    </span>
+                  </div>
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeAlert(alert.id);
+                    }} 
+                    className="text-gray-400 hover:text-red-600 p-1.5 hover:bg-red-50 rounded-full transition-colors"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="p-6 space-y-8 flex-1 overflow-y-auto pb-24">
@@ -553,7 +731,7 @@ export default function App() {
               {filterSkills.length > 0 && <span className="text-black text-[10px] font-mono">{filterSkills.length} sel</span>}
             </label>
             <div className="flex flex-wrap gap-2">
-              {allSkills.map(skill => (
+              {allAvailableSkills.map(skill => (
                 <button
                   key={skill}
                   onClick={() => toggleSelection(skill, filterSkills, setFilterSkills)}
@@ -645,7 +823,7 @@ export default function App() {
             onClick={() => setView('list')}
             className="w-full bg-white text-black border-2 border-black py-4 rounded-xl font-bold text-sm tracking-wide uppercase hover:bg-gray-50 transition-colors"
           >
-            Ver {filteredJobs.length} Resultados
+            Ver {totalCount} Resultados
           </button>
         </div>
       </div>
@@ -667,7 +845,7 @@ export default function App() {
             </button>
             <button 
               onClick={handleNextJob} 
-              disabled={currentJobIndex === -1 || currentJobIndex >= filteredJobs.length - 1}
+              disabled={currentJobIndex === -1 || currentJobIndex >= jobs.length - 1}
               className="p-2 hover:bg-gray-100 rounded-full disabled:opacity-30 disabled:hover:bg-transparent transition-all text-black"
             >
               <ChevronRight size={24} />
@@ -749,12 +927,12 @@ export default function App() {
           </div>
 
           <div className="flex flex-wrap gap-2 mb-6">
-             {selectedJob.required_skills?.map(skill => (
+             {Array.isArray(selectedJob.required_skills) && selectedJob.required_skills.map(skill => (
                <span key={skill} className="px-3 py-1 bg-white border border-gray-200 rounded-full text-xs font-medium text-gray-700">
                  {skill}
                </span>
              ))}
-             {selectedJob.required_languages?.map((langItem, idx) => {
+             {Array.isArray(selectedJob.required_languages) && selectedJob.required_languages.map((langItem, idx) => {
                let langName, langLevel;
                if (typeof langItem === 'string') {
                  langName = langItem;
@@ -800,11 +978,6 @@ export default function App() {
                     : 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'
                 }`}
               >
-                <div 
-                  className={`w-3 h-3 rounded-full shadow-sm ${
-                    selectedJob.status === 'Open' ? 'bg-green-500' : 'bg-red-500'
-                  }`}
-                />
                 {selectedJob.status === 'Open' ? 'Abierta' : 'Cerrada'}
               </button>
             </div>
@@ -860,7 +1033,7 @@ export default function App() {
       <header className="bg-white border-b border-gray-200 p-4 sticky top-0 z-10">
         <div className="flex justify-between items-center mb-4">
           <h1 className="text-xl font-mono font-bold tracking-tighter text-black flex items-center">
-            <img src="/icon-dark.svg" className="h-5 w-auto mr-2 mt-0.5" alt="Logo" />job-alerts<span className="animate-pulse">_</span>
+            <img src="/icon-dark.png" className="h-5 w-auto mr-2" alt="Logo" />job-alerts<span className="animate-pulse">_</span>
           </h1>
           
           <div className="flex items-center gap-2">
@@ -905,7 +1078,7 @@ export default function App() {
       {/* Stats Bar */}
       <div className="px-5 py-2 bg-white border-b border-gray-100 flex justify-between items-center">
         <span className="font-bold text-[10px] text-gray-400 uppercase tracking-wider">
-          {filteredJobs.length} Resultados
+          {totalCount} Resultados
         </span>
         
         {activeFiltersCount > 0 && (

@@ -7,7 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg', 'icon.svg'],
+      includeAssets: ['icon.ico', 'apple-touch-icon.png', 'icon.svg'],
       manifest: {
         name: 'job-alerts',
         short_name: 'job-alerts',
@@ -29,6 +29,5 @@ export default defineConfig({
         ]
       }
     })
-    // --------------------------
   ],
 })
