@@ -70,7 +70,7 @@ export default function App() {
   const [loadingSession, setLoadingSession] = useState(true);
 
   // --- ALERTAS ---
-  const { alerts, addAlert, removeAlert, enablePushNotifications, isPushEnabled } = useJobAlerts(supabase, session);
+  const { alerts, addAlert, removeAlert } = useJobAlerts(supabase, session);
   
   // --- LEÍDOS ---
   const { isRead, markAsRead } = useReadJobs();
@@ -585,15 +585,6 @@ export default function App() {
               <Bell size={14} /> Alertas Activas
             </h3>
             <div className="flex gap-2">
-              {/* Botón para forzar activación de Push */}
-              <button 
-                onClick={() => enablePushNotifications()}
-                className="text-xs bg-gray-200 text-gray-700 px-3 py-2 rounded-full font-medium hover:bg-gray-300 transition-colors"
-                title="Activar notificaciones Push en este dispositivo"
-              >
-                {isPushEnabled ? '🔔 Push Activo' : '🔕 Activar Push'}
-              </button>
-
               <button 
                 onClick={() => addAlert({
                   searchTerm,
@@ -854,7 +845,7 @@ export default function App() {
 
         </div>
 
-        <div className="p-6 pt-2 border-t border-gray-100 bg-white safe-area-bottom fixed bottom-0 left-0 right-0 max-w-md mx-auto">
+        <div className="p-6 pt-2 border-t border-gray-100 bg-white safe-area-bottom fixed bottom-0 left-0 right-0 max-w-md mx-auto z-50">
           <button 
             onClick={() => setView('list')}
             className="w-full bg-white text-black border-2 border-black py-4 rounded-xl font-bold text-sm tracking-wide uppercase hover:bg-gray-50 transition-colors"
