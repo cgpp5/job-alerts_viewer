@@ -1,57 +1,170 @@
 import { useEffect, useState } from 'react';
 
+// Helper para convertir la clave VAPID
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding)
+    .replace(/-/g, '+')
+    .replace(/_/g, '/');
+
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
+// ¡IMPORTANTE! Debes generar tus propias claves VAPID.
+// Puedes hacerlo en https://web-push-codelab.glitch.me/ o usando web-push en node.
+const VAPID_PUBLIC_KEY = 'BPTfpD9gH1O5yAHkPV6KEsO5mrhGONsF0Oh1VNmfiT3QAjDPlAtihCX94YX4Uyn4k-ps4RBO14h9gl9yrqo3lRA'; 
+
 export function useJobAlerts(supabase, session) {
   const [alerts, setAlerts] = useState([]);
+  const [isPushEnabled, setIsPushEnabled] = useState(false);
 
-  // Cargar alertas guardadas al iniciar
+  // 1. Cargar alertas (LocalStorage + Supabase)
   useEffect(() => {
+    // Cargar de LocalStorage primero (para inmediatez)
     const saved = localStorage.getItem('job_alerts');
     if (saved) {
       try {
         setAlerts(JSON.parse(saved));
       } catch (e) {
-        console.error("Error parsing alerts", e);
+        console.error("Error parsing local alerts", e);
       }
     }
-  }, []);
 
-  // Guardar alertas cuando cambian
-  useEffect(() => {
-    localStorage.setItem('job_alerts', JSON.stringify(alerts));
-  }, [alerts]);
-
-  const addAlert = (filters) => {
-    if (!("Notification" in window)) {
-      alert("Este navegador no soporta notificaciones de escritorio");
-      return;
+    // Si hay sesión, cargar de Supabase
+    if (session?.user) {
+      loadRemoteAlerts();
+      checkPushSubscription();
     }
+  }, [session]);
 
-    if (Notification.permission !== 'granted') {
-      Notification.requestPermission().then(permission => {
-        if (permission === 'granted') {
-          saveAlert(filters);
-        }
-      });
-    } else {
-      saveAlert(filters);
+  const loadRemoteAlerts = async () => {
+    const { data, error } = await supabase
+      .from('user_alerts')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (!error && data) {
+      // Mapeamos para mantener formato compatible
+      const remoteAlerts = data.map(a => ({
+        id: a.id,
+        createdAt: a.created_at,
+        filters: a.filters,
+        isRemote: true // Flag para saber que viene de DB
+      }));
+      setAlerts(remoteAlerts);
+      // Sincronizar con local
+      localStorage.setItem('job_alerts', JSON.stringify(remoteAlerts));
     }
   };
 
-  const saveAlert = (filters) => {
-    const newAlert = {
+  const checkPushSubscription = async () => {
+    if ('serviceWorker' in navigator) {
+      const registration = await navigator.serviceWorker.ready;
+      const subscription = await registration.pushManager.getSubscription();
+      setIsPushEnabled(!!subscription);
+    }
+  };
+
+  // 2. Guardar Alerta
+  const addAlert = async (filters) => {
+    // Primero pedimos permiso de notificación si no lo tenemos
+    if (Notification.permission !== 'granted') {
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        alert("Necesitas activar las notificaciones para recibir alertas.");
+        return;
+      }
+    }
+
+    // Intentamos activar Push si es posible
+    await enablePushNotifications();
+
+    const newAlertLocal = {
       id: Date.now(),
       createdAt: new Date().toISOString(),
       filters
     };
-    setAlerts(prev => [...prev, newAlert]);
-    alert('✅ Alerta creada. Recibirás una notificación cuando llegue una oferta que coincida.');
+
+    // Optimistic update
+    const updatedAlerts = [...alerts, newAlertLocal];
+    setAlerts(updatedAlerts);
+    localStorage.setItem('job_alerts', JSON.stringify(updatedAlerts));
+
+    // Guardar en Supabase si hay sesión
+    if (session?.user) {
+      const { error } = await supabase
+        .from('user_alerts')
+        .insert([{
+          user_id: session.user.id,
+          filters: filters
+        }]);
+      
+      if (error) {
+        console.error("Error saving alert to Supabase:", error);
+        alert("Error guardando alerta en la nube. Se guardó solo localmente.");
+      } else {
+        alert('✅ Alerta guardada y sincronizada.');
+        loadRemoteAlerts(); // Recargar para tener los IDs reales
+      }
+    } else {
+      alert('✅ Alerta guardada localmente (inicia sesión para sincronizar).');
+    }
   };
 
-  const removeAlert = (id) => {
-    setAlerts(prev => prev.filter(a => a.id !== id));
+  const removeAlert = async (id) => {
+    // Optimistic delete
+    const updatedAlerts = alerts.filter(a => a.id !== id);
+    setAlerts(updatedAlerts);
+    localStorage.setItem('job_alerts', JSON.stringify(updatedAlerts));
+
+    if (session?.user) {
+      await supabase.from('user_alerts').delete().eq('id', id);
+    }
   };
 
-  // Lógica de coincidencia (replicada de App.jsx)
+  // 3. Activar Web Push
+  const enablePushNotifications = async () => {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      console.log("Push messaging not supported");
+      return;
+    }
+
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      
+      // Suscribirse al Push Manager del navegador
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      });
+
+      console.log("Push Subscription:", subscription);
+
+      // Guardar suscripción en Supabase
+      if (session?.user) {
+        const { error } = await supabase
+          .from('push_subscriptions')
+          .upsert({
+            user_id: session.user.id,
+            subscription: subscription
+          }, { onConflict: 'user_id, subscription' });
+
+        if (error) console.error("Error saving push subscription:", error);
+        else setIsPushEnabled(true);
+      }
+
+    } catch (error) {
+      console.error("Error enabling push notifications:", error);
+    }
+  };
+
+  // Lógica de coincidencia (Mantenemos la local para feedback inmediato en PC)
   const matchesFilters = (job, filters) => {
     try {
       const {
@@ -120,7 +233,7 @@ export function useJobAlerts(supabase, session) {
     }
   };
 
-  // Suscripción a Realtime
+  // Suscripción a Realtime (Solo para PC/App abierta)
   useEffect(() => {
     if (alerts.length === 0) return;
     // Si requerimos sesión para recibir eventos (RLS), esperamos a tener sesión.
@@ -159,5 +272,5 @@ export function useJobAlerts(supabase, session) {
     };
   }, [alerts, supabase, session]);
 
-  return { alerts, addAlert, removeAlert };
+  return { alerts, addAlert, removeAlert, enablePushNotifications, isPushEnabled };
 }
