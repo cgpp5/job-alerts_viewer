@@ -39,16 +39,18 @@ self.addEventListener('notificationclick', function(event) {
 
   event.waitUntil(
     clients.matchAll({type: 'window', includeUncontrolled: true}).then(function(clientList) {
-      // Si ya hay una ventana abierta, enfocarla
+      const urlToOpen = new URL(event.notification.data ? event.notification.data.url : '/', self.location.origin).href;
+      
+      // Si ya hay una ventana abierta, enfocarla y navegar a la URL
       for (var i = 0; i < clientList.length; i++) {
         var client = clientList[i];
         if (client.url && 'focus' in client) {
-          return client.focus();
+          client.focus();
+          return client.navigate(urlToOpen);
         }
       }
       // Si no, abrir una nueva
       if (clients.openWindow) {
-        const urlToOpen = event.notification.data ? event.notification.data.url : '/';
         return clients.openWindow(urlToOpen);
       }
     })

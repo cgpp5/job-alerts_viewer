@@ -10,7 +10,7 @@ export default defineConfig({
       srcDir: 'src',
       filename: 'sw.js',
       registerType: 'autoUpdate',
-      includeAssets: ['icon.ico', 'apple-touch-icon.png', 'icon.svg'],
+      includeAssets: ['apple-touch-icon.png', 'icon.svg'],
       manifest: {
         name: 'job-alerts',
         short_name: 'job-alerts',
