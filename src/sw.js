@@ -1,3 +1,9 @@
+import { cleanupOutdatedCaches, precacheAndRoute } from 'workbox-precaching'
+
+cleanupOutdatedCaches()
+
+precacheAndRoute(self.__WB_MANIFEST)
+
 self.addEventListener('push', function(event) {
   console.log('[Service Worker] Push Received.');
   
