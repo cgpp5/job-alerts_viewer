@@ -70,7 +70,7 @@ export default function App() {
   const [loadingSession, setLoadingSession] = useState(true);
 
   // --- ALERTAS ---
-  const { alerts, addAlert, removeAlert } = useJobAlerts(supabase, session);
+  const { alerts, addAlert, removeAlert, enablePushNotifications, isPushEnabled } = useJobAlerts(supabase, session);
   
   // --- LEÍDOS ---
   const { isRead, markAsRead } = useReadJobs();
@@ -585,23 +585,37 @@ export default function App() {
               <Bell size={14} /> Alertas Activas
             </h3>
             <div className="flex gap-2">
-              <button 
-                onClick={() => addAlert({
-                  searchTerm,
-                  filterStatus,
-                  filterWorkplace,
-                  filterEmployment,
-                  filterLocation,
-                  filterSalary,
-                  filterSkills,
-                  filterExperience,
-                  filterLanguages
-                })}
-                className="text-sm bg-black text-white px-4 py-2 rounded-full font-medium hover:bg-gray-800 transition-colors flex items-center gap-2"
-              >
-                <BellRing size={14} />
-                Crear Alerta
-              </button>
+              {/* Botón Activar Notificaciones (solo si no están activas) */}
+              {!isPushEnabled && (
+                <button 
+                  onClick={() => enablePushNotifications()}
+                  className="text-sm bg-black text-white px-4 py-2 rounded-full font-medium hover:bg-gray-800 transition-colors flex items-center gap-2"
+                >
+                  <BellRing size={14} />
+                  Activar Notificaciones
+                </button>
+              )}
+
+              {/* Botón Crear Alerta (solo si hay filtros activos) */}
+              {(searchTerm || filterStatus !== 'all' || filterWorkplace.length > 0 || filterEmployment.length > 0 || filterLocation || filterSalary > 0 || filterSkills.length > 0 || filterLanguages.length > 0 || filterExperience[0] !== 0 || filterExperience[1] !== 30) && (
+                <button 
+                  onClick={() => addAlert({
+                    searchTerm,
+                    filterStatus,
+                    filterWorkplace,
+                    filterEmployment,
+                    filterLocation,
+                    filterSalary,
+                    filterSkills,
+                    filterExperience,
+                    filterLanguages
+                  })}
+                  className="text-sm bg-black text-white px-4 py-2 rounded-full font-medium hover:bg-gray-800 transition-colors flex items-center gap-2"
+                >
+                  <BellRing size={14} />
+                  Crear Alerta
+                </button>
+              )}
             </div>
           </div>
           
