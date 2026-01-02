@@ -18,7 +18,7 @@ function urlBase64ToUint8Array(base64String) {
 
 // ¡IMPORTANTE! Debes generar tus propias claves VAPID.
 // Puedes hacerlo en https://web-push-codelab.glitch.me/ o usando web-push en node.
-const VAPID_PUBLIC_KEY = 'BPTfpD9gH1O5yAHkPV6KEsO5mrhGONsF0Oh1VNmfiT3QAjDPlAtihCX94YX4Uyn4k-ps4RBO14h9gl9yrqo3lRA'; 
+const VAPID_PUBLIC_KEY = 'BFKi2z-R_ZbFIH4gMhtgqKaLQruoS5Njwk9SOMKXkDiLe8kBoy9YaR7bASWvl4bMMxynBJnaWJmVeRTnENoMvPc'; 
 
 export function useJobAlerts(supabase, session) {
   const [alerts, setAlerts] = useState([]);
