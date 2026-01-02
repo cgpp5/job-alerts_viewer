@@ -148,15 +148,25 @@ export function useJobAlerts(supabase, session) {
 
       // Guardar suscripción en Supabase
       if (session?.user) {
+        // Convertir a JSON puro para evitar problemas de serialización
+        const subscriptionJSON = JSON.parse(JSON.stringify(subscription));
+
         const { error } = await supabase
           .from('push_subscriptions')
           .upsert({
             user_id: session.user.id,
-            subscription: subscription
+            subscription: subscriptionJSON
           }, { onConflict: 'user_id, subscription' });
 
-        if (error) console.error("Error saving push subscription:", error);
-        else setIsPushEnabled(true);
+        if (error) {
+            console.error("Error saving push subscription:", error);
+            alert("Error guardando suscripción en servidor: " + error.message);
+        } else {
+            setIsPushEnabled(true);
+            alert("✅ Notificaciones Push activadas correctamente en servidor.");
+        }
+      } else {
+          alert("No hay sesión de usuario activa. No se puede guardar la suscripción.");
       }
 
     } catch (error) {
