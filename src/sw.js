@@ -10,7 +10,7 @@ self.addEventListener('push', function(event) {
   let title = 'Nueva oferta';
   let options = {
     body: 'Tienes una nueva oferta de trabajo.',
-    icon: '/icon-dark.png',
+    icon: '/icon.svg', // Icono SVG
     tag: 'job-alert',
     renotify: true
   };
@@ -18,7 +18,7 @@ self.addEventListener('push', function(event) {
   if (event.data) {
     try {
       const data = event.data.json();
-      title = `PUSH: ${data.title}`;
+      title = data.title; // Título limpio
       options.body = data.body;
       options.data = { url: data.url || '/' };
     } catch (e) {

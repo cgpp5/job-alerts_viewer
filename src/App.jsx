@@ -128,7 +128,7 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 25;
 
-  // --- CARGA INICIAL DE SKILLS ---
+  // --- CARGA INICIAL DE SKILLS Y GESTIÓN DE URL PARAMS ---
   useEffect(() => {
     async function loadAllSkills() {
       // Descargamos solo la columna de skills de todas las ofertas para poblar el filtro
@@ -145,7 +145,21 @@ export default function App() {
     }
     
     loadAllSkills();
-  }, []);
+
+    // Comprobar si venimos de una notificación (URL params)
+    const params = new URLSearchParams(window.location.search);
+    const alertId = params.get('alertId');
+    
+    if (alertId && alerts.length > 0) {
+      const alert = alerts.find(a => a.id.toString() === alertId);
+      if (alert) {
+        console.log("Cargando alerta desde notificación:", alert);
+        loadAlertFilters(alert.filters);
+        // Limpiar URL para no recargar filtros al refrescar
+        window.history.replaceState({}, document.title, "/");
+      }
+    }
+  }, [alerts]); // Dependencia alerts para asegurar que ya están cargadas
 
   // --- EFECTO PARA CARGAR DATOS DE SUPABASE (BACKEND FILTERING) ---
   useEffect(() => {

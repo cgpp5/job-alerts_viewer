@@ -43,17 +43,23 @@ serve(async (req) => {
     const usersToNotify = new Set()
 
     // 2. Filtrar
+    const matches = []
     for (const alert of allAlerts) {
       if (matchesFilters(newJob, alert.filters)) {
-        usersToNotify.add(alert.user_id)
+        // Evitar duplicados si un usuario tiene varias alertas que coinciden
+        if (!matches.some(m => m.userId === alert.user_id)) {
+             matches.push({ userId: alert.user_id, alertId: alert.id }) 
+        }
       }
     }
 
-    console.log(`Sending notifications to ${usersToNotify.size} users`)
+    console.log(`Sending notifications to ${matches.length} matches`)
 
     // 3. Enviar
     const results = []
-    for (const userId of usersToNotify) {
+    for (const match of matches) {
+      const { userId, alertId } = match
+      
       const { data: subscriptions } = await supabase
         .from('push_subscriptions')
         .select('subscription')
@@ -68,9 +74,9 @@ serve(async (req) => {
                 : sub.subscription
 
             const pushPayload = JSON.stringify({
-              title: `Nueva oferta: ${newJob.title}`,
+              title: newJob.title, // Título limpio
               body: `${newJob.company} - ${newJob.location}`,
-              url: `/?jobId=${newJob.job_id}` 
+              url: `/?alertId=${alertId}&jobId=${newJob.job_id}` // Pasamos el ID de la alerta
             })
 
             await webpush.sendNotification(pushSubscription, pushPayload)
