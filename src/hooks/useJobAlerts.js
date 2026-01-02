@@ -53,63 +53,86 @@ export function useJobAlerts(supabase) {
 
   // Lógica de coincidencia (replicada de App.jsx)
   const matchesFilters = (job, filters) => {
-    const {
-      searchTerm,
-      filterStatus,
-      filterWorkplace,
-      filterEmployment,
-      filterLocation,
-      filterSalary,
-      filterSkills,
-      filterExperience,
-      filterLanguages
-    } = filters;
+    try {
+      const {
+        searchTerm,
+        filterStatus,
+        filterWorkplace,
+        filterEmployment,
+        filterLocation,
+        filterSalary,
+        filterSkills,
+        filterExperience,
+        filterLanguages
+      } = filters;
 
-    const matchesSearch = (job.title || '').toLowerCase().includes((searchTerm || '').toLowerCase()) || 
-                          (job.company || '').toLowerCase().includes((searchTerm || '').toLowerCase());
-    
-    const matchesStatus = filterStatus === 'all' || job.status === filterStatus;
-    
-    const matchesWorkplace = (filterWorkplace || []).length === 0 || 
-                             (filterWorkplace || []).includes(job.workplace_type);
+      const matchesSearch = (job.title || '').toLowerCase().includes((searchTerm || '').toLowerCase()) || 
+                            (job.company || '').toLowerCase().includes((searchTerm || '').toLowerCase());
+      
+      const matchesStatus = filterStatus === 'all' || job.status === filterStatus;
+      
+      const matchesWorkplace = (filterWorkplace || []).length === 0 || 
+                               (filterWorkplace || []).includes(job.workplace_type);
 
-    const matchesEmployment = (filterEmployment || []).length === 0 || 
-                              (filterEmployment || []).some(type => (job.employment_type || '').includes(type));
+      const matchesEmployment = (filterEmployment || []).length === 0 || 
+                                (filterEmployment || []).some(type => (job.employment_type || '').includes(type));
 
-    const matchesLocation = (filterLocation || "") === "" || 
-                            (job.location || '').toLowerCase().includes((filterLocation || "").toLowerCase());
-    
-    const matchesSalary = (job.salary_max || job.salary_min || 0) >= (filterSalary || 0);
+      const matchesLocation = (filterLocation || "") === "" || 
+                              (job.location || '').toLowerCase().includes((filterLocation || "").toLowerCase());
+      
+      const matchesSalary = (job.salary_max || job.salary_min || 0) >= (filterSalary || 0);
 
-    const matchesSkills = (filterSkills || []).length === 0 || 
-                          (filterSkills || []).every(skill => (job.required_skills || []).includes(skill));
+      // Handle skills (Array or null)
+      const jobSkills = Array.isArray(job.required_skills) ? job.required_skills : [];
+      const matchesSkills = (filterSkills || []).length === 0 || 
+                            (filterSkills || []).every(skill => jobSkills.includes(skill));
 
-    const exp = job.required_experience_years || 0;
-    const matchesExperience = exp >= (filterExperience?.[0] || 0) && exp <= (filterExperience?.[1] || 100);
+      const exp = job.required_experience_years || 0;
+      const matchesExperience = exp >= (filterExperience?.[0] || 0) && exp <= (filterExperience?.[1] || 100);
 
-    const matchesLanguages = (filterLanguages || []).length === 0 || 
-                             (filterLanguages || []).every(filterLang => 
-                               (job.required_languages || []).some(lang => {
-                                 if (typeof lang === 'string') return lang === filterLang;
-                                 if (typeof lang === 'object' && lang !== null) return Object.keys(lang)[0] === filterLang;
-                                 return false;
-                               })
-                             );
-    
-    return matchesSearch && matchesStatus && matchesWorkplace && matchesEmployment && matchesLocation && matchesSalary && matchesSkills && matchesExperience && matchesLanguages;
+      // Handle languages (Array, Object, or null)
+      let jobLanguages = [];
+      if (Array.isArray(job.required_languages)) {
+        jobLanguages = job.required_languages;
+      } else if (typeof job.required_languages === 'object' && job.required_languages !== null) {
+        jobLanguages = Object.keys(job.required_languages);
+      }
+
+      const matchesLanguages = (filterLanguages || []).length === 0 || 
+                               (filterLanguages || []).every(filterLang => {
+                                  // Check if filterLang is in jobLanguages (handling string or object keys)
+                                  return jobLanguages.some(lang => {
+                                     if (typeof lang === 'string') return lang === filterLang;
+                                     if (typeof lang === 'object' && lang !== null) return Object.keys(lang)[0] === filterLang;
+                                     return false;
+                                  });
+                               });
+      
+      return matchesSearch && matchesStatus && matchesWorkplace && matchesEmployment && matchesLocation && matchesSalary && matchesSkills && matchesExperience && matchesLanguages;
+    } catch (error) {
+      console.error("Error in matchesFilters", error, job);
+      return false;
+    }
   };
 
   // Suscripción a Realtime
   useEffect(() => {
     if (alerts.length === 0) return;
 
+    console.log("Subscribing to job alerts with filters:", alerts);
+
     const channel = supabase
       .channel('jobs-alerts')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'jobs' }, (payload) => {
+        console.log("New job received via Realtime:", payload.new);
         const newJob = payload.new;
         
         alerts.forEach(alert => {
-          if (matchesFilters(newJob, alert.filters)) {
+          const isMatch = matchesFilters(newJob, alert.filters);
+          console.log(`Checking alert ${alert.id}: Match = ${isMatch}`);
+          
+          if (isMatch) {
+            console.log("Triggering notification for job:", newJob.title);
             new Notification(`🔔 Nueva oferta: ${newJob.title}`, {
               body: `${newJob.company} - ${newJob.location}\nHaz clic para ver más.`,
               icon: '/icon-dark.png',
@@ -118,7 +141,9 @@ export function useJobAlerts(supabase) {
           }
         });
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log("Realtime subscription status:", status);
+      });
 
     return () => {
       supabase.removeChannel(channel);
