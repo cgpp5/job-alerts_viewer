@@ -226,8 +226,9 @@ export default function App() {
              return `required_languages->${dbLang}.not.is.null`;
           });
 
-          // Incluimos ofertas con JSON vacío {} (sin requisitos de idioma)
+          // Incluimos ofertas con JSON vacío {} (sin requisitos de idioma) O si es NULL
           conditions.push('required_languages.eq.{}');
+          conditions.push('required_languages.is.null');
 
           query = query.or(conditions.join(','));
         }

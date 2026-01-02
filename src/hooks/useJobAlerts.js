@@ -72,23 +72,27 @@ export function useJobAlerts(supabase, session) {
       const matchesStatus = filterStatus === 'all' || job.status === filterStatus;
       
       const matchesWorkplace = (filterWorkplace || []).length === 0 || 
-                               (filterWorkplace || []).includes(job.workplace_type);
+                               (filterWorkplace || []).includes(job.workplace_type) || 
+                               !job.workplace_type;
 
       const matchesEmployment = (filterEmployment || []).length === 0 || 
-                                (filterEmployment || []).some(type => (job.employment_type || '').includes(type));
+                                (filterEmployment || []).some(type => (job.employment_type || '').includes(type)) ||
+                                !job.employment_type;
 
       const matchesLocation = (filterLocation || "") === "" || 
                               (job.location || '').toLowerCase().includes((filterLocation || "").toLowerCase());
       
-      const matchesSalary = (job.salary_max || job.salary_min || 0) >= (filterSalary || 0);
+      const matchesSalary = (job.salary_max || job.salary_min || 0) >= (filterSalary || 0) || 
+                            (!job.salary_min && !job.salary_max);
 
       // Handle skills (Array or null)
       const jobSkills = Array.isArray(job.required_skills) ? job.required_skills : [];
       const matchesSkills = (filterSkills || []).length === 0 || 
                             (filterSkills || []).every(skill => jobSkills.includes(skill));
 
-      const exp = job.required_experience_years || 0;
-      const matchesExperience = exp >= (filterExperience?.[0] || 0) && exp <= (filterExperience?.[1] || 100);
+      const exp = job.required_experience_years;
+      const matchesExperience = (exp === null || exp === undefined) || 
+                                (exp >= (filterExperience?.[0] || 0) && exp <= (filterExperience?.[1] || 100));
 
       // Handle languages (Array, Object, or null)
       let jobLanguages = [];
@@ -99,6 +103,7 @@ export function useJobAlerts(supabase, session) {
       }
 
       const matchesLanguages = (filterLanguages || []).length === 0 || 
+                               (jobLanguages.length === 0) || // Match if no languages required
                                (filterLanguages || []).every(filterLang => {
                                   // Check if filterLang is in jobLanguages (handling string or object keys)
                                   return jobLanguages.some(lang => {
