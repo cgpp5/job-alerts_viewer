@@ -70,7 +70,7 @@ export default function App() {
   const [loadingSession, setLoadingSession] = useState(true);
 
   // --- ALERTAS ---
-  const { alerts, addAlert, removeAlert } = useJobAlerts(supabase, session);
+  const { alerts, addAlert, removeAlert, enablePushNotifications, isPushEnabled } = useJobAlerts(supabase, session);
   
   // --- LEÍDOS ---
   const { isRead, markAsRead } = useReadJobs();
@@ -570,23 +570,34 @@ export default function App() {
             <h3 className="text-sm font-bold uppercase tracking-widest text-gray-500 flex items-center gap-2">
               <Bell size={14} /> Alertas Activas
             </h3>
-            <button 
-              onClick={() => addAlert({
-                searchTerm,
-                filterStatus,
-                filterWorkplace,
-                filterEmployment,
-                filterLocation,
-                filterSalary,
-                filterSkills,
-                filterExperience,
-                filterLanguages
-              })}
-              className="text-sm bg-black text-white px-4 py-2 rounded-full font-medium hover:bg-gray-800 transition-colors flex items-center gap-2"
-            >
-              <BellRing size={14} />
-              Crear Alerta con Filtros Actuales
-            </button>
+            <div className="flex gap-2">
+              {/* Botón para forzar activación de Push */}
+              <button 
+                onClick={() => enablePushNotifications()}
+                className="text-xs bg-gray-200 text-gray-700 px-3 py-2 rounded-full font-medium hover:bg-gray-300 transition-colors"
+                title="Activar notificaciones Push en este dispositivo"
+              >
+                {isPushEnabled ? '🔔 Push Activo' : '🔕 Activar Push'}
+              </button>
+
+              <button 
+                onClick={() => addAlert({
+                  searchTerm,
+                  filterStatus,
+                  filterWorkplace,
+                  filterEmployment,
+                  filterLocation,
+                  filterSalary,
+                  filterSkills,
+                  filterExperience,
+                  filterLanguages
+                })}
+                className="text-sm bg-black text-white px-4 py-2 rounded-full font-medium hover:bg-gray-800 transition-colors flex items-center gap-2"
+              >
+                <BellRing size={14} />
+                Crear Alerta
+              </button>
+            </div>
           </div>
           
           {alerts.length === 0 ? (
