@@ -70,7 +70,7 @@ export default function App() {
   const [loadingSession, setLoadingSession] = useState(true);
 
   // --- ALERTAS ---
-  const { alerts, addAlert, removeAlert } = useJobAlerts(supabase);
+  const { alerts, addAlert, removeAlert } = useJobAlerts(supabase, session);
   
   // --- LEÍDOS ---
   const { isRead, markAsRead } = useReadJobs();

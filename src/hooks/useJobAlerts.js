@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-export function useJobAlerts(supabase) {
+export function useJobAlerts(supabase, session) {
   const [alerts, setAlerts] = useState([]);
 
   // Cargar alertas guardadas al iniciar
@@ -118,8 +118,11 @@ export function useJobAlerts(supabase) {
   // Suscripción a Realtime
   useEffect(() => {
     if (alerts.length === 0) return;
-
-    console.log("Subscribing to job alerts with filters:", alerts);
+    // Si requerimos sesión para recibir eventos (RLS), esperamos a tener sesión.
+    // Si la app permite acceso público, esto no es necesario, pero dado el problema,
+    // es mejor asegurar que la suscripción se refresque con la sesión.
+    
+    console.log("Subscribing to job alerts. Session present:", !!session);
 
     const channel = supabase
       .channel('jobs-alerts')
@@ -146,9 +149,10 @@ export function useJobAlerts(supabase) {
       });
 
     return () => {
+      console.log("Unsubscribing from job alerts");
       supabase.removeChannel(channel);
     };
-  }, [alerts, supabase]);
+  }, [alerts, supabase, session]);
 
   return { alerts, addAlert, removeAlert };
 }
