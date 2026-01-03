@@ -103,23 +103,52 @@ export default function App() {
   const [selectedJob, setSelectedJob] = useState(null);
   
   // --- ESTADOS DE FILTROS ---
-  const [searchTerm, setSearchTerm] = useState("");
+  // Cargar filtros guardados
+  const savedFilters = useMemo(() => {
+    try {
+      const saved = localStorage.getItem('last_filters');
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+      console.error("Error loading saved filters", e);
+      return {};
+    }
+  }, []);
+
+  const [searchTerm, setSearchTerm] = useState(savedFilters.searchTerm || "");
   const debouncedSearchTerm = useDebounce(searchTerm, 1000);
 
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [filterWorkplace, setFilterWorkplace] = useState([]); 
-  const [filterEmployment, setFilterEmployment] = useState([]);
-  const [filterLocation, setFilterLocation] = useState("");
+  const [filterStatus, setFilterStatus] = useState(savedFilters.filterStatus || 'all');
+  const [filterWorkplace, setFilterWorkplace] = useState(savedFilters.filterWorkplace || []); 
+  const [filterEmployment, setFilterEmployment] = useState(savedFilters.filterEmployment || []);
+  const [filterLocation, setFilterLocation] = useState(savedFilters.filterLocation || "");
   const debouncedFilterLocation = useDebounce(filterLocation, 1000);
 
-  const [filterSalary, setFilterSalary] = useState(0);
+  const [filterSalary, setFilterSalary] = useState(savedFilters.filterSalary || 0);
   const debouncedFilterSalary = useDebounce(filterSalary, 1000);
 
-  const [filterSkills, setFilterSkills] = useState([]);
-  const [filterExperience, setFilterExperience] = useState([0, 30]);
+  const [filterSkills, setFilterSkills] = useState(savedFilters.filterSkills || []);
+  const [filterExperience, setFilterExperience] = useState(savedFilters.filterExperience || [0, 30]);
   const debouncedFilterExperience = useDebounce(filterExperience, 1000);
 
-  const [filterLanguages, setFilterLanguages] = useState([]);
+  const [filterLanguages, setFilterLanguages] = useState(savedFilters.filterLanguages || []);
+
+  // Guardar filtros al cambiar
+  useEffect(() => {
+    const filtersToSave = {
+      searchTerm,
+      filterStatus,
+      filterWorkplace,
+      filterEmployment,
+      filterLocation,
+      filterSalary,
+      filterSkills,
+      filterExperience,
+      filterLanguages
+    };
+    localStorage.setItem('last_filters', JSON.stringify(filtersToSave));
+  }, [searchTerm, filterStatus, filterWorkplace, filterEmployment, filterLocation, filterSalary, filterSkills, filterExperience, filterLanguages]);
+  
+  // Estado para la lista completa de skills (para los filtros)
   
   // Estado para la lista completa de skills (para los filtros)
   const [allAvailableSkills, setAllAvailableSkills] = useState([]);
