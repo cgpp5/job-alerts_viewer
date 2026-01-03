@@ -2,7 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Opcional: Para que el scroll sea suave en toda la web */
-html {
-    scroll-behavior: smooth;
+html, body {
+    height: 100%;
+    width: 100%;
+    overflow: hidden; /* Previene el scroll en el body */
+    overscroll-behavior-y: none; /* Desactiva el efecto rebote en iOS */
+    -webkit-tap-highlight-color: transparent;
+}
+
+#root {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
 }

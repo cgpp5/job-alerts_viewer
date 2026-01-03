@@ -333,42 +333,72 @@ export default function App() {
   ]);
 
   // --- PULL TO REFRESH HANDLERS ---
-  const handleTouchStart = (e) => {
-    if (listRef.current && listRef.current.scrollTop === 0) {
-      setPullStartPoint(e.targetTouches[0].clientY);
-    }
-  };
+  // Usamos useEffect para añadir listeners no pasivos (necesario para iOS preventDefault)
+  useEffect(() => {
+    const element = listRef.current;
+    if (!element) return;
 
-  const handleTouchMove = (e) => {
-    if (!pullStartPoint) return;
-    
-    const currentY = e.targetTouches[0].clientY;
-    const diff = currentY - pullStartPoint;
+    let startY = 0;
+    let isPulling = false;
 
-    if (diff > 0 && listRef.current.scrollTop === 0) {
-      // Añadimos resistencia al arrastre
-      setPullChange(diff * 0.4);
-      // Prevenir scroll nativo si estamos haciendo pull
-      if (diff < 200) e.preventDefault?.(); 
-    }
-  };
+    const onTouchStart = (e) => {
+      if (element.scrollTop === 0) {
+        startY = e.targetTouches[0].clientY;
+        isPulling = true;
+      } else {
+        isPulling = false;
+      }
+    };
 
-  const handleTouchEnd = () => {
-    if (!pullStartPoint) return;
+    const onTouchMove = (e) => {
+      if (!isPulling) return;
+      
+      const currentY = e.targetTouches[0].clientY;
+      const diff = currentY - startY;
 
-    if (pullChange > 80) { // Umbral para refrescar
-      setIsRefreshing(true);
-      setRefreshTrigger(prev => prev + 1);
-      // Resetear después de un tiempo (simulado o cuando termine la carga)
-      setTimeout(() => {
-        setIsRefreshing(false);
+      if (diff > 0 && element.scrollTop === 0) {
+        // Si estamos arrastrando hacia abajo en el tope, prevenimos el scroll nativo
+        if (e.cancelable) e.preventDefault();
+        
+        // Añadimos resistencia
+        setPullChange(diff * 0.4);
+      } else {
+        // Si subimos o ya no estamos en el tope, dejamos de considerar pull
         setPullChange(0);
-      }, 1500);
-    } else {
-      setPullChange(0);
-    }
-    setPullStartPoint(0);
-  };
+      }
+    };
+
+    const onTouchEnd = () => {
+      if (!isPulling) return;
+      isPulling = false;
+
+      setPullChange(currentChange => {
+        if (currentChange > 80) {
+          setIsRefreshing(true);
+          setRefreshTrigger(prev => prev + 1);
+          setTimeout(() => {
+            setIsRefreshing(false);
+            setPullChange(0);
+          }, 1500);
+        } else {
+          setPullChange(0);
+        }
+        return 0; // Reset inmediato del estado local si no se usa en el render
+      });
+      // Nota: setPullChange es asíncrono, pero aquí queremos resetear el valor visual
+      // Si no se refresca, reseteamos visualmente
+    };
+
+    element.addEventListener('touchstart', onTouchStart, { passive: true });
+    element.addEventListener('touchmove', onTouchMove, { passive: false }); // Importante: passive: false
+    element.addEventListener('touchend', onTouchEnd);
+
+    return () => {
+      element.removeEventListener('touchstart', onTouchStart);
+      element.removeEventListener('touchmove', onTouchMove);
+      element.removeEventListener('touchend', onTouchEnd);
+    };
+  }, []); // Empty dependency array, we use refs and setters
 
   const formatDate = (dateStr) => {
     if (!dateStr) return 'Sin fecha';
@@ -1212,9 +1242,6 @@ export default function App() {
       <div 
         ref={listRef} 
         className="flex-1 overflow-y-auto bg-gray-50 relative"
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
       >
         {/* Pull to Refresh Indicator */}
         <div 
