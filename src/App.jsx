@@ -132,6 +132,12 @@ export default function App() {
 
   const [filterLanguages, setFilterLanguages] = useState(savedFilters.filterLanguages || []);
 
+  // --- PULL TO REFRESH STATES ---
+  const [pullStartPoint, setPullStartPoint] = useState(0);
+  const [pullChange, setPullChange] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
   // Guardar filtros al cambiar
   useEffect(() => {
     const filtersToSave = {
@@ -322,10 +328,47 @@ export default function App() {
     debouncedFilterSalary, 
     filterSkills, 
     debouncedFilterExperience,
-    filterLanguages
+    filterLanguages,
+    refreshTrigger
   ]);
 
+  // --- PULL TO REFRESH HANDLERS ---
+  const handleTouchStart = (e) => {
+    if (listRef.current && listRef.current.scrollTop === 0) {
+      setPullStartPoint(e.targetTouches[0].clientY);
+    }
+  };
 
+  const handleTouchMove = (e) => {
+    if (!pullStartPoint) return;
+    
+    const currentY = e.targetTouches[0].clientY;
+    const diff = currentY - pullStartPoint;
+
+    if (diff > 0 && listRef.current.scrollTop === 0) {
+      // Añadimos resistencia al arrastre
+      setPullChange(diff * 0.4);
+      // Prevenir scroll nativo si estamos haciendo pull
+      if (diff < 200) e.preventDefault?.(); 
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (!pullStartPoint) return;
+
+    if (pullChange > 80) { // Umbral para refrescar
+      setIsRefreshing(true);
+      setRefreshTrigger(prev => prev + 1);
+      // Resetear después de un tiempo (simulado o cuando termine la carga)
+      setTimeout(() => {
+        setIsRefreshing(false);
+        setPullChange(0);
+      }, 1500);
+    } else {
+      setPullChange(0);
+    }
+    setPullStartPoint(0);
+  };
 
   const formatDate = (dateStr) => {
     if (!dateStr) return 'Sin fecha';
@@ -1166,7 +1209,40 @@ export default function App() {
       </div>
 
       {/* List */}
-      <div ref={listRef} className="flex-1 overflow-y-auto bg-gray-50">
+      <div 
+        ref={listRef} 
+        className="flex-1 overflow-y-auto bg-gray-50 relative"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        {/* Pull to Refresh Indicator */}
+        <div 
+          className="absolute top-0 left-0 w-full flex justify-center pointer-events-none transition-transform duration-200 ease-out z-20"
+          style={{ 
+            transform: `translateY(${pullChange > 0 ? pullChange - 40 : -40}px)`,
+            opacity: pullChange > 0 ? Math.min(pullChange / 60, 1) : 0
+          }}
+        >
+          <div className="bg-white rounded-full p-2 shadow-md border border-gray-100">
+            {isRefreshing ? (
+              <Loader2 className="animate-spin text-black" size={20} />
+            ) : (
+              <div 
+                className="text-black transition-transform duration-200"
+                style={{ transform: `rotate(${pullChange * 2}deg)` }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                  <path d="M3 3v5h5" />
+                  <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+                  <path d="M16 21h5v-5" />
+                </svg>
+              </div>
+            )}
+          </div>
+        </div>
+
         {paginatedJobs.length > 0 ? (
           <>
             {paginatedJobs.map(job => (
