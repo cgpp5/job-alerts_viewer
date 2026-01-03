@@ -342,7 +342,8 @@ export default function App() {
     let isPulling = false;
 
     const onTouchStart = (e) => {
-      if (element.scrollTop === 0) {
+      // Permitimos un pequeño margen de error en scrollTop para iOS
+      if (element.scrollTop <= 1) {
         startY = e.targetTouches[0].clientY;
         isPulling = true;
       } else {
@@ -356,15 +357,19 @@ export default function App() {
       const currentY = e.targetTouches[0].clientY;
       const diff = currentY - startY;
 
-      if (diff > 0 && element.scrollTop === 0) {
-        // Si estamos arrastrando hacia abajo en el tope, prevenimos el scroll nativo
-        if (e.cancelable) e.preventDefault();
+      // Si arrastramos hacia abajo (diff > 0) y estamos arriba
+      if (diff > 0 && element.scrollTop <= 1) {
+        // IMPORTANTE: Prevenir el comportamiento nativo (scroll/bounce)
+        if (e.cancelable) {
+          e.preventDefault();
+        }
         
         // Añadimos resistencia
-        setPullChange(diff * 0.4);
+        setPullChange(diff * 0.5); // Aumenté un poco la sensibilidad
       } else {
-        // Si subimos o ya no estamos en el tope, dejamos de considerar pull
+        // Si el usuario sube el dedo, o ya no estamos en el tope
         setPullChange(0);
+        // Si sube el dedo, permitimos el scroll nativo (no llamamos preventDefault)
       }
     };
 
@@ -373,7 +378,7 @@ export default function App() {
       isPulling = false;
 
       setPullChange(currentChange => {
-        if (currentChange > 80) {
+        if (currentChange > 70) { // Bajé un poco el umbral
           setIsRefreshing(true);
           setRefreshTrigger(prev => prev + 1);
           setTimeout(() => {
@@ -383,14 +388,13 @@ export default function App() {
         } else {
           setPullChange(0);
         }
-        return 0; // Reset inmediato del estado local si no se usa en el render
+        return 0; 
       });
-      // Nota: setPullChange es asíncrono, pero aquí queremos resetear el valor visual
-      // Si no se refresca, reseteamos visualmente
     };
 
+    // Usamos passive: false para poder llamar a preventDefault en touchmove
     element.addEventListener('touchstart', onTouchStart, { passive: true });
-    element.addEventListener('touchmove', onTouchMove, { passive: false }); // Importante: passive: false
+    element.addEventListener('touchmove', onTouchMove, { passive: false });
     element.addEventListener('touchend', onTouchEnd);
 
     return () => {
@@ -398,7 +402,7 @@ export default function App() {
       element.removeEventListener('touchmove', onTouchMove);
       element.removeEventListener('touchend', onTouchEnd);
     };
-  }, []); // Empty dependency array, we use refs and setters
+  }, []); 
 
   const formatDate = (dateStr) => {
     if (!dateStr) return 'Sin fecha';
@@ -1241,13 +1245,13 @@ export default function App() {
       {/* List */}
       <div 
         ref={listRef} 
-        className="flex-1 overflow-y-auto bg-gray-50 relative"
+        className="flex-1 overflow-y-auto bg-gray-50 relative overscroll-contain"
       >
         {/* Pull to Refresh Indicator */}
         <div 
-          className="absolute top-0 left-0 w-full flex justify-center pointer-events-none transition-transform duration-200 ease-out z-20"
+          className="absolute top-0 left-0 w-full flex justify-center pointer-events-none transition-transform duration-200 ease-out z-50"
           style={{ 
-            transform: `translateY(${pullChange > 0 ? pullChange - 40 : -40}px)`,
+            transform: `translateY(${pullChange > 0 ? pullChange - 50 : -50}px)`,
             opacity: pullChange > 0 ? Math.min(pullChange / 60, 1) : 0
           }}
         >
