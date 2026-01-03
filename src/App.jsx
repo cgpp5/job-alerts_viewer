@@ -133,7 +133,7 @@ export default function App() {
   const [filterLanguages, setFilterLanguages] = useState(savedFilters.filterLanguages || []);
 
   // --- PULL TO REFRESH STATES ---
-  const [pullStartPoint, setPullStartPoint] = useState(0);
+  const pullStartY = useRef(0);
   const [pullChange, setPullChange] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -333,76 +333,43 @@ export default function App() {
   ]);
 
   // --- PULL TO REFRESH HANDLERS ---
-  // Usamos useEffect para añadir listeners no pasivos (necesario para iOS preventDefault)
-  useEffect(() => {
-    const element = listRef.current;
-    if (!element) return;
+  const handlePullStart = (e) => {
+    if (listRef.current && listRef.current.scrollTop <= 1 && !isRefreshing) {
+      pullStartY.current = e.touches[0].clientY;
+    } else {
+      pullStartY.current = 0;
+    }
+  };
 
-    let startY = 0;
-    let isPulling = false;
+  const handlePullMove = (e) => {
+    if (!pullStartY.current || isRefreshing) return;
+    if (!listRef.current || listRef.current.scrollTop > 1) {
+      pullStartY.current = 0;
+      setPullChange(0);
+      return;
+    }
 
-    const onTouchStart = (e) => {
-      // Permitimos un pequeño margen de error en scrollTop para iOS
-      if (element.scrollTop <= 1) {
-        startY = e.targetTouches[0].clientY;
-        isPulling = true;
-      } else {
-        isPulling = false;
-      }
-    };
+    const currentY = e.touches[0].clientY;
+    const diff = currentY - pullStartY.current;
 
-    const onTouchMove = (e) => {
-      if (!isPulling) return;
-      
-      const currentY = e.targetTouches[0].clientY;
-      const diff = currentY - startY;
+    if (diff > 0) {
+      setPullChange(diff * 0.5);
+    }
+  };
 
-      // Si arrastramos hacia abajo (diff > 0) y estamos arriba
-      if (diff > 0 && element.scrollTop <= 1) {
-        // IMPORTANTE: Prevenir el comportamiento nativo (scroll/bounce)
-        if (e.cancelable) {
-          e.preventDefault();
-        }
-        
-        // Añadimos resistencia
-        setPullChange(diff * 0.5); // Aumenté un poco la sensibilidad
-      } else {
-        // Si el usuario sube el dedo, o ya no estamos en el tope
+  const handlePullEnd = () => {
+    if (pullChange > 70 && !isRefreshing) {
+      setIsRefreshing(true);
+      setRefreshTrigger(prev => prev + 1);
+      setTimeout(() => {
+        setIsRefreshing(false);
         setPullChange(0);
-        // Si sube el dedo, permitimos el scroll nativo (no llamamos preventDefault)
-      }
-    };
-
-    const onTouchEnd = () => {
-      if (!isPulling) return;
-      isPulling = false;
-
-      setPullChange(currentChange => {
-        if (currentChange > 70) { // Bajé un poco el umbral
-          setIsRefreshing(true);
-          setRefreshTrigger(prev => prev + 1);
-          setTimeout(() => {
-            setIsRefreshing(false);
-            setPullChange(0);
-          }, 1500);
-        } else {
-          setPullChange(0);
-        }
-        return 0; 
-      });
-    };
-
-    // Usamos passive: false para poder llamar a preventDefault en touchmove
-    element.addEventListener('touchstart', onTouchStart, { passive: true });
-    element.addEventListener('touchmove', onTouchMove, { passive: false });
-    element.addEventListener('touchend', onTouchEnd);
-
-    return () => {
-      element.removeEventListener('touchstart', onTouchStart);
-      element.removeEventListener('touchmove', onTouchMove);
-      element.removeEventListener('touchend', onTouchEnd);
-    };
-  }, []); 
+      }, 1500);
+    } else {
+      setPullChange(0);
+    }
+    pullStartY.current = 0;
+  };
 
   const formatDate = (dateStr) => {
     if (!dateStr) return 'Sin fecha';
@@ -1246,6 +1213,9 @@ export default function App() {
       <div 
         ref={listRef} 
         className="flex-1 overflow-y-auto bg-gray-50 relative overscroll-contain"
+        onTouchStart={handlePullStart}
+        onTouchMove={handlePullMove}
+        onTouchEnd={handlePullEnd}
       >
         {/* Pull to Refresh Indicator */}
         <div 
