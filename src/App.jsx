@@ -449,6 +449,13 @@ export default function App() {
     setFilterExperience(newRange);
   };
 
+  // Marcar como leído automáticamente al seleccionar un trabajo (cubre click, teclado y flechas)
+  useEffect(() => {
+    if (selectedJob) {
+      markAsRead(selectedJob.job_id);
+    }
+  }, [selectedJob]);
+
   const currentJobIndex = useMemo(() => {
     if (!selectedJob) return -1;
     return jobs.findIndex(j => j.job_id === selectedJob.job_id);
